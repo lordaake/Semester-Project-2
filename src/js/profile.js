@@ -1,3 +1,4 @@
+// Import necessary modules and constants
 import { initializeEventListeners } from './avatarModal.js';
 import { API_BASE_URL, USER_PROFILE_ENDPOINT, USER_LISTINGS_ENDPOINT, accessToken, credits, username } from "./constants.js";
 import { updateLoginLink } from "./loggedIn.js";
@@ -9,6 +10,7 @@ updateLoginLink();
 // Function to get the current user's ID
 export function getCurrentUserId() {
     if (!accessToken) {
+        // Throw an error if access token is not found
         throw new Error('Access token not found. Please log in.');
     }
 
@@ -25,14 +27,12 @@ async function displayUserProfile() {
 
         // Check if user is not logged in
         if (!accessToken) {
+            // Show failure modal and redirect to login page when modal is closed
             showFailureModal('You need to log in or register a profile first before accessing your profile.');
-
-            // Redirect to the login page when modal is closed
             const failureModal = new bootstrap.Modal(document.getElementById('failureModal'));
             failureModal._element.addEventListener('hidden.bs.modal', () => {
                 window.location.href = '/auth/login.html';
             });
-
             return;
         }
 
@@ -50,6 +50,7 @@ async function displayUserProfile() {
 
         const profileData = await response.json();
 
+        // Display profile information in UI elements
         if (usernameElement) {
             usernameElement.textContent = profileData.name || username; // Fallback to the username variable if name isn't in response
         }
@@ -60,6 +61,7 @@ async function displayUserProfile() {
             userProfilePic.src = profileData.avatar; // Use the avatar URL from the profile data
         }
     } catch (error) {
+        // Show failure modal with error message
         showFailureModal('Error displaying user profile:', error.message);
     }
 }
@@ -85,13 +87,13 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
-
+// Function to display user listings
 async function displayUserListings() {
     try {
         const listingsUrl = `${API_BASE_URL}${USER_PROFILE_ENDPOINT}${username}/listings?_bids=true`;
         const response = await fetch(listingsUrl, {
             headers: {
-                Authorization: `Bearer ${accessToken}`
+                Authorization: `Bearer ${accessToken}` // Use access token for authorization
             }
         });
 
@@ -117,11 +119,13 @@ async function displayUserListings() {
     }
 }
 
+// Function to create HTML element for a listing
 function createListingElement(listing) {
     const hasBids = listing.bids && listing.bids.length > 0;
     const lastBid = hasBids ? listing.bids[listing.bids.length - 1] : null;
     const lastBidText = lastBid ? `Last Bid: ${lastBid.amount} credits by ${lastBid.bidderName}` : 'No bids yet';
 
+    // Create HTML structure for listing element
     const listingElement = document.createElement('div');
     listingElement.classList.add('col-md-4', 'col-sm-6');
     listingElement.innerHTML = `
@@ -148,6 +152,7 @@ function createListingElement(listing) {
     return listingElement;
 }
 
+// Function to trigger deletion confirmation modal for a listing
 function triggerDeleteConfirmation(listing, listingElement) {
     // Show the confirmation modal using Bootstrap's modal functionality
     const confirmationModal = new bootstrap.Modal(document.getElementById('confirmationModal'), {
@@ -176,6 +181,7 @@ function triggerDeleteConfirmation(listing, listingElement) {
     }, { once: true }); // Ensure this event listener only triggers once
 }
 
+// Call function to display user listings
 displayUserListings();
 
 // Event listener when DOM content is loaded
@@ -187,26 +193,21 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Event listeners for avatar and edit icons
     const avatarIcon = document.getElementById('avatarIcon');
-    const editIcon = document.getElementById('editIcon');
     const avatarModal = new bootstrap.Modal(document.getElementById('avatarModal'), {});
-    const editModal = new bootstrap.Modal(document.getElementById('editModal'), {});
 
+    // Show avatar modal when avatar icon is clicked
     if (avatarIcon) {
         avatarIcon.addEventListener('click', () => {
             avatarModal.show();
         });
     }
-
-    if (editIcon) {
-        editIcon.addEventListener('click', () => {
-            editModal.show();
-        });
-    }
 });
 
+// Event listener when DOM content is loaded
 document.addEventListener('DOMContentLoaded', function () {
     const avatarForm = document.querySelector('#avatarModal form');
 
+    // Event listener for avatar form submission
     avatarForm.addEventListener('submit', async function (event) {
         event.preventDefault(); // Prevent the default form submission.
 
@@ -218,10 +219,12 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
+        // Call function to update avatar with provided URL
         await updateAvatar(username, avatarUrl); // Use the imported 'username'
     });
 });
 
+// Function to update user avatar
 async function updateAvatar(userName, avatarUrl) {
     const url = `${API_BASE_URL}${USER_PROFILE_ENDPOINT}${encodeURIComponent(userName)}/media`;
     const options = {

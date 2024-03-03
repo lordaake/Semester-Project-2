@@ -1,5 +1,6 @@
 // Auction.js
 
+// Import necessary constants and functions from other modules
 import { API_BASE_URL, USER_LISTINGS_ENDPOINT, accessToken, username } from "./constants.js";
 import { updateLoginLink } from "./loggedIn.js";
 import { showSuccessModal, showFailureModal } from "./modal.js";
@@ -9,12 +10,15 @@ updateLoginLink();
 
 // Function to fetch data from the API
 async function fetchData(url, method = 'GET', body = null) {
+    // Define headers with Content-Type as application/json
     const headers = { 'Content-Type': 'application/json' };
 
+    // Include access token in the Authorization header if available
     if (accessToken) {
         headers['Authorization'] = `Bearer ${accessToken}`;
     }
 
+    // Prepare configuration for the fetch request
     const config = {
         method: method,
         headers: headers,
@@ -22,12 +26,16 @@ async function fetchData(url, method = 'GET', body = null) {
     };
 
     try {
+        // Fetch data from the specified URL with the provided configuration
         const response = await fetch(url, config);
         if (!response.ok) {
+            // Throw an error if the network response is not successful
             throw new Error(`Network response was not ok: ${response.statusText}`);
         }
+        // Parse and return JSON response
         return await response.json();
     } catch (error) {
+        // Log and re-throw any errors that occur during the fetch operation
         console.error('Error fetching data:', error);
         throw error;
     }
@@ -35,23 +43,23 @@ async function fetchData(url, method = 'GET', body = null) {
 
 // Function to create HTML for each listing item
 function createItemCard(listing) {
-    const imageUrl = listing.media && listing.media.length > 0 ? listing.media[0] : '/images/placeholderauction.png';
-
-    // Extract last bid information using the last entry in the bids array
+    // Determine information about the latest bid
     const lastBidObj = listing.bids && listing.bids.length > 0 ? listing.bids[listing.bids.length - 1] : null;
     const lastBidInfo = lastBidObj
         ? `Last Bid: $${lastBidObj.amount} by ${lastBidObj.bidderName}`
         : 'No bids yet';
 
-    // Use the _count object to get the number of bids
+    // Determine the number of bids for the listing
     const bidCount = listing._count && listing._count.bids ? listing._count.bids : 0;
     const bidCountInfo = bidCount > 0
         ? `<p class="card-text">Number of Bids: ${bidCount}</p>`
         : '<p class="card-text">No bids yet</p>';
 
+    // Format deadline and creation date texts
     const bidDeadlineText = new Date(listing.endsAt).toLocaleString();
     const creationDateText = new Date(listing.created).toLocaleDateString();
 
+    // Create card element to display the listing
     const card = document.createElement('div');
     card.className = 'col-md-4 mb-4';
 
@@ -72,6 +80,7 @@ function createItemCard(listing) {
             </div>`;
         });
 
+        // Set up HTML content for the card with carousel
         card.innerHTML = `
             <div id="carouselExampleCaptions${listing.id}" class="carousel slide" data-bs-ride="carousel">
                 <div class="carousel-indicators">
@@ -104,6 +113,7 @@ function createItemCard(listing) {
             </div>
         `;
     } else {
+        // Set up HTML content for the card without carousel
         card.innerHTML = `
         <div class="card">
             <img src="/images/placeholderauction.png" class="card-img-top" alt="Placeholder Image">
@@ -123,16 +133,14 @@ function createItemCard(listing) {
     `;
     }
 
+    // Create input field for placing bids
     const bidInput = document.createElement('input');
     bidInput.className = 'form-control bid-input';
     bidInput.setAttribute('type', 'number');
     bidInput.setAttribute('placeholder', 'Enter bid amount');
     bidInput.setAttribute('min', '0'); // Setting minimum value to 0
 
-    const bidInputGroup = document.createElement('div');
-    bidInputGroup.className = 'input-group mb-3';
-    bidInputGroup.appendChild(bidInput);
-
+    // Create button for placing bids
     const bidButton = document.createElement('button');
     bidButton.className = 'btn btn-primary bid-button';
     bidButton.setAttribute('data-listing-id', listing.id);
@@ -141,7 +149,7 @@ function createItemCard(listing) {
     // Check if user is logged in
     const isLoggedIn = accessToken !== null && accessToken !== undefined;
 
-    // Add event listener only if user is logged in
+    // Add event listener for placing bids
     if (isLoggedIn) {
         bidButton.addEventListener('click', function () {
             const bidAmountString = bidInput.value.trim();
@@ -173,6 +181,7 @@ function createItemCard(listing) {
                 })
             };
 
+            // Make a POST request to place bid
             fetch(url, options)
                 .then(response => {
                     if (!response.ok) {
@@ -183,6 +192,7 @@ function createItemCard(listing) {
                 .then(data => {
                     showSuccessModal('Bid successful. Thank you!');
 
+                    // Reload the page after the success modal is closed
                     const successModalEl = document.getElementById('successModal');
 
                     successModalEl.addEventListener('hidden.bs.modal', function () {
@@ -191,7 +201,7 @@ function createItemCard(listing) {
 
                 })
                 .catch(error => {
-                    showFailureModal('There was an error placing your bid. Please try again.');
+                    showFailureModal('There was an error placing your bid. Remember, you cannot bid on your own items.');
                 });
         });
     } else {
@@ -201,22 +211,33 @@ function createItemCard(listing) {
         });
     }
 
+    // Create HTML structure for bid input group
+    const bidInputGroup = document.createElement('div');
+    bidInputGroup.className = 'input-group mb-3';
+    bidInputGroup.appendChild(bidInput);
+
+    // Create HTML structure for bid button group
     const bidInputGroupAppend = document.createElement('div');
     bidInputGroupAppend.className = 'input-group-append';
     bidInputGroupAppend.appendChild(bidButton);
 
+    // Combine input group and button group into a container
     const bidInputGroupContainer = document.createElement('div');
     bidInputGroupContainer.appendChild(bidInputGroup);
     bidInputGroupContainer.appendChild(bidInputGroupAppend);
 
+    // Append bid input and button to the card body
     card.querySelector('.card-body').appendChild(bidInputGroupContainer);
 
+    // Return the card element
     return card;
 }
 
 // Function to update the UI with fetched listings
 function updateUIWithListings(listings, container, currentPage = 1) {
+    // Define the number of listings to display per page
     const listingsPerPage = 20;
+    // Calculate total number of pages
     const totalPages = Math.ceil(listings.length / listingsPerPage);
 
     // Sort listings by creation date (most recent first)
@@ -225,6 +246,7 @@ function updateUIWithListings(listings, container, currentPage = 1) {
     // Calculate start and end indexes for the current page
     const startIndex = (currentPage - 1) * listingsPerPage;
     const endIndex = Math.min(startIndex + listingsPerPage, listings.length);
+    // Extract listings for the current page
     const listingsToShow = listings.slice(startIndex, endIndex);
 
     // Clear container
@@ -248,6 +270,7 @@ function updateUIWithListings(listings, container, currentPage = 1) {
         if (i === currentPage) {
             pageButton.classList.add('active');
         }
+        // Add event listener to each page button
         pageButton.addEventListener('click', () => {
             updateUIWithListings(listings, container, i);
         });
@@ -258,15 +281,19 @@ function updateUIWithListings(listings, container, currentPage = 1) {
 // Function to initialize the application
 async function initialize() {
     try {
+        // Get the container for listing cards
         const itemCardsContainer = document.getElementById('itemCardsContainer');
+        // Fetch all listings from the API
         let allListings = await fetchAllListings();
 
+        // Update UI with fetched listings
         updateUIWithListings(allListings, itemCardsContainer);
 
         // Search functionality
         const searchInput = document.getElementById('searchInput');
         const searchButton = document.getElementById('searchButton');
 
+        // Define function to handle search
         const handleSearch = async () => {
             const searchTerm = searchInput.value.trim().toLowerCase();
             if (searchTerm === '') {
@@ -292,20 +319,24 @@ async function initialize() {
             }
         });
     } catch (error) {
+        // Log any errors that occur during initialization
         console.error('Error initializing auction:', error);
     }
 }
 
+// Function to fetch all listings from the API
 async function fetchAllListings() {
     let allListings = [];
     let offset = 0;
     let hasMoreListings = true;
 
+    // Fetch listings in batches until there are no more listings
     while (hasMoreListings) {
         const listingsUrl = `${API_BASE_URL}${USER_LISTINGS_ENDPOINT}?_bids=true&_active=true&limit=100&offset=${offset}`;
         const listings = await fetchData(listingsUrl);
 
         if (listings.length > 0) {
+            // Concatenate fetched listings to the array
             allListings = allListings.concat(listings);
             offset += 100; // increment offset to get the next batch of listings
         } else {
@@ -313,12 +344,12 @@ async function fetchAllListings() {
         }
     }
 
+    // Return the complete list of listings
     return allListings;
 }
 
+// Initialize the application when DOM content is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    // Call your initialize function or other initialization code here
+    // Call the initialize function to start the application
     initialize();
 });
-
-
