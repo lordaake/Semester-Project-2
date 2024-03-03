@@ -18,9 +18,23 @@ export function getCurrentUserId() {
 // Function to display user profile
 async function displayUserProfile() {
     try {
+        const accessToken = localStorage.getItem('accessToken');
         const usernameElement = document.getElementById('username');
         const userCreditsElement = document.getElementById('userCredits');
         const userProfilePic = document.getElementById('profile-image');
+
+        // Check if user is not logged in
+        if (!accessToken) {
+            showFailureModal('You need to log in or register a profile first before accessing your profile.');
+
+            // Redirect to the login page when modal is closed
+            const failureModal = new bootstrap.Modal(document.getElementById('failureModal'));
+            failureModal._element.addEventListener('hidden.bs.modal', () => {
+                window.location.href = '/auth/login.html';
+            });
+
+            return;
+        }
 
         // Make a GET request to fetch profile details
         const profileUrl = `${API_BASE_URL}${USER_PROFILE_ENDPOINT}${encodeURIComponent(username)}`;
@@ -50,9 +64,31 @@ async function displayUserProfile() {
     }
 }
 
+// Event listener when DOM content is loaded
+document.addEventListener('DOMContentLoaded', () => {
+    // Redirect to login page when modal is closed
+    const failureModal = new bootstrap.Modal(document.getElementById('failureModal'));
+    failureModal._element.addEventListener('hidden.bs.modal', () => {
+        window.location.href = '/auth/login.html';
+    });
+
+    // Event listener to redirect when modal close button ("X") is clicked
+    const closeButton = document.querySelector('#failureModal .modal-header .btn-close');
+    closeButton.addEventListener('click', () => {
+        window.location.href = '/auth/login.html';
+    });
+
+    // Event listener to redirect when modal close button within modal body is clicked
+    const closeBodyButton = document.querySelector('#failureModal .modal-footer .btn-danger');
+    closeBodyButton.addEventListener('click', () => {
+        window.location.href = '/auth/login.html';
+    });
+});
+
+
 async function displayUserListings() {
     try {
-        const listingsUrl = `${API_BASE_URL}${USER_PROFILE_ENDPOINT}${username}/listings`;
+        const listingsUrl = `${API_BASE_URL}${USER_PROFILE_ENDPOINT}${username}/listings?_bids=true`;
         const response = await fetch(listingsUrl, {
             headers: {
                 Authorization: `Bearer ${accessToken}`
@@ -82,7 +118,10 @@ async function displayUserListings() {
 }
 
 function createListingElement(listing) {
-    // Create listing card element with listing details
+    const hasBids = listing.bids && listing.bids.length > 0;
+    const lastBid = hasBids ? listing.bids[listing.bids.length - 1] : null;
+    const lastBidText = lastBid ? `Last Bid: ${lastBid.amount} credits by ${lastBid.bidderName}` : 'No bids yet';
+
     const listingElement = document.createElement('div');
     listingElement.classList.add('col-md-4', 'col-sm-6');
     listingElement.innerHTML = `
@@ -91,13 +130,10 @@ function createListingElement(listing) {
             <div class="card-body">
                 <h5 class="card-title">${listing.title}</h5>
                 <p class="card-text">${listing.description}</p>
-                <p class="card-text">${listing.bids && listing.bids.length > 0 ? `Last Bid: ${listing.bids[listing.bids.length - 1].amount}` : 'No bids yet'}</p>
+                <p class="card-text">${lastBidText}</p>
                 <p class="card-text">${listing._count && listing._count.bids ? `Number of Bids: ${listing._count.bids}` : 'No bids yet'}</p>
                 <p class="card-text"><strong>Deadline:</strong> ${new Date(listing.endsAt).toLocaleString()}</p>
                 <p class="card-text"><strong>Listing Date:</strong> ${new Date(listing.created).toLocaleDateString()}</p>
-            </div>
-            <div class="card-footer bg-white border-top-0">
-                <small>Price: ${listing.price}</small>
             </div>
         </div>
     `;

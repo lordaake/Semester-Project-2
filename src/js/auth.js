@@ -1,4 +1,3 @@
-// Import necessary functions from modal.js
 import { showSuccessModal, showFailureModal } from './modal.js';
 import { API_BASE_URL, REGISTRATION_ENDPOINT, LOGIN_ENDPOINT } from './constants.js';
 import { updateLoginLink } from './loggedIn.js';
@@ -10,8 +9,6 @@ if (localStorage.length > 0) {
     // Clear local storage
     localStorage.clear();
     console.log('Local storage cleared successfully.');
-} else {
-    console.log('Local storage is already empty.');
 }
 
 document.addEventListener("DOMContentLoaded", function () {
