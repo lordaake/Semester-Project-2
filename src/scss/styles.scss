@@ -33,39 +33,3 @@ a {
 .listing p {
     margin: 5px 0;
 }
-
-.carousel-control-prev-icon,
-.carousel-control-next-icon {
-    background-image: none;
-    /* Remove default Bootstrap background */
-    background-color: rgba(0, 0, 0, 0.5);
-    /* Add a semi-transparent background */
-    border-radius: 50%;
-    /* Make it round */
-    width: 40px;
-    /* Set a fixed width */
-    height: 40px;
-    /* Set a fixed height */
-    display: flex;
-    /* Use flex for centering the SVG icon */
-    justify-content: center;
-    /* Center horizontally */
-    align-items: center;
-    /* Center vertically */
-}
-
-.carousel-control-prev-icon:after,
-.carousel-control-next-icon:after {
-    content: '';
-    /* This will represent the arrow */
-    display: inline-block;
-    /* Make it an inline block */
-    width: 20px;
-    /* Width of the arrow */
-    height: 20px;
-    /* Height of the arrow */
-    background: url('/path-to-your-custom-arrow.svg') no-repeat center center;
-    /* Path to the custom arrow icon */
-    background-size: contain;
-    /* Make the icon fit within the box */
-}

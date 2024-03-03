@@ -181,7 +181,7 @@ function createItemCard(listing) {
                     return response.json();
                 })
                 .then(data => {
-                    showSuccessModal('Bid successful:');
+                    showSuccessModal('Bid successful. Thank you!');
 
                     const successModalEl = document.getElementById('successModal');
 
