@@ -1,0 +1,895 @@
+Content of auction.js:
+// Auction.js
+
+import { API_BASE_URL, USER_LISTINGS_ENDPOINT, accessToken, username } from "./constants.js";
+import { updateLoginLink } from "./loggedIn.js";
+import { showSuccessModal, showFailureModal } from "./modal.js";
+
+// Check if user is logged in and update login link
+updateLoginLink();
+
+// Function to fetch data from the API
+async function fetchData(url, method = 'GET', body = null) {
+    const headers = { 'Content-Type': 'application/json' };
+
+    if (accessToken) {
+        headers['Authorization'] = `Bearer ${accessToken}`;
+    }
+
+    const config = {
+        method: method,
+        headers: headers,
+        body: body ? JSON.stringify(body) : null
+    };
+
+    try {
+        const response = await fetch(url, config);
+        if (!response.ok) {
+            throw new Error(`Network response was not ok: ${response.statusText}`);
+        }
+        return await response.json();
+    } catch (error) {
+        console.error('Error fetching data:', error);
+        throw error;
+    }
+}
+
+// Function to create HTML for each listing item
+function createItemCard(listing) {
+    const imageUrl = listing.media && listing.media.length > 0 ? listing.media[0] : '/images/placeholderauction.png';
+
+    // Extract last bid information using the last entry in the bids array
+    const lastBidObj = listing.bids && listing.bids.length > 0 ? listing.bids[listing.bids.length - 1] : null;
+    const lastBidInfo = lastBidObj
+        ? `Last Bid: $${lastBidObj.amount} by ${lastBidObj.bidderName}`
+        : 'No bids yet';
+
+    // Use the _count object to get the number of bids
+    const bidCount = listing._count && listing._count.bids ? listing._count.bids : 0;
+    const bidCountInfo = bidCount > 0
+        ? `<p class="card-text">Number of Bids: ${bidCount}</p>`
+        : '<p class="card-text">No bids yet</p>';
+
+    const bidDeadlineText = new Date(listing.endsAt).toLocaleString();
+    const creationDateText = new Date(listing.created).toLocaleDateString();
+
+    const card = document.createElement('div');
+    card.className = 'col-md-4 mb-4';
+
+    let carouselIndicators = '';
+    let carouselInner = '';
+
+    // Check if listing.media (URLs for all images) has any media
+    if (listing.media && listing.media.length > 0) {
+        // Create carousel indicators and items
+        listing.media.forEach((url, index) => {
+            carouselIndicators += `<button type="button" data-bs-target="#carouselExampleCaptions${listing.id}" 
+                data-bs-slide-to="${index}" class="${index === 0 ? 'active' : ''}" 
+                aria-current="${index === 0 ? 'true' : ''}" aria-label="Slide ${index + 1}"></button>`;
+
+            carouselInner += `<div class="carousel-item ${index === 0 ? 'active' : ''}">
+                <img src="${url.trim() || '/images/placeholderauction.png'}" 
+                class="d-block w-100" alt="Image ${index + 1}">
+            </div>`;
+        });
+
+        card.innerHTML = `
+            <div id="carouselExampleCaptions${listing.id}" class="carousel slide" data-bs-ride="carousel">
+                <div class="carousel-indicators">
+                    ${carouselIndicators}
+                </div>
+                <div class="carousel-inner">
+                    ${carouselInner}
+                </div>
+                <button class="carousel-control-prev" type="button" 
+                    data-bs-target="#carouselExampleCaptions${listing.id}" data-bs-slide="prev">
+                    <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                    <span class="visually-hidden">Previous</span>
+                </button>
+                <button class="carousel-control-next" type="button" 
+                    data-bs-target="#carouselExampleCaptions${listing.id}" data-bs-slide="next">
+                    <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                    <span class="visually-hidden">Next</span>
+                </button>
+            </div>
+            <div class="card-body">
+                <h5 class="card-title">${listing.title}</h5>
+                <p class="card-text">${listing.description}</p>
+                ${bidCountInfo} 
+                <div class="mt-auto">
+                    <p class="card-text">${lastBidInfo}</p>
+                    <p class="card-text"><strong>Deadline:</strong> ${bidDeadlineText}</p>
+                    <p class="card-text"><strong>Listing Date:</strong> ${creationDateText}</p> 
+                    <p class="card-text mb-2"><strong>Tags:</strong> ${listing.tags.join(', ')}</p> 
+                </div>
+            </div>
+        `;
+    } else {
+        card.innerHTML = `
+        <div class="card">
+            <img src="/images/placeholderauction.png" class="card-img-top" alt="Placeholder Image">
+            <div class="card-body">
+                <h5 class="card-title">${listing.title}</h5>
+                <p class="card-text">${listing.description}</p>
+                ${bidCountInfo} 
+                <div class="mt-auto">
+                    <p class="card-text">${lastBidInfo}</p>
+                    <p class="card-text"><strong>Deadline:</strong> ${bidDeadlineText}</p>
+                    <p class="card-text"><strong>Listing Date:</strong> ${creationDateText}</p> 
+                    <p class="card-text mb-2"><strong>Tags:</strong> ${listing.tags.join(', ')}</p> 
+                </div>
+            </div>
+            </div>
+        </div>
+    `;
+    }
+
+    const bidInput = document.createElement('input');
+    bidInput.className = 'form-control bid-input';
+    bidInput.setAttribute('type', 'number');
+    bidInput.setAttribute('placeholder', 'Enter bid amount');
+    bidInput.setAttribute('min', '0'); // Setting minimum value to 0
+
+    const bidInputGroup = document.createElement('div');
+    bidInputGroup.className = 'input-group mb-3';
+    bidInputGroup.appendChild(bidInput);
+
+    const bidButton = document.createElement('button');
+    bidButton.className = 'btn btn-primary bid-button';
+    bidButton.setAttribute('data-listing-id', listing.id);
+    bidButton.textContent = 'Place Bid';
+
+    // Check if user is logged in
+    const isLoggedIn = accessToken !== null && accessToken !== undefined;
+
+    // Add event listener only if user is logged in
+    if (isLoggedIn) {
+        bidButton.addEventListener('click', function () {
+            const bidAmountString = bidInput.value.trim();
+            const bidAmount = Number(bidAmountString);
+
+            if (isNaN(bidAmount)) {
+                console.error('Invalid bid amount:', bidAmountString);
+                showFailureModal('Please enter a valid bid amount.');
+                return;
+            }
+
+            // Check if the bid amount is higher than the last bid amount
+            if (lastBidObj && bidAmount <= lastBidObj.amount) {
+                showFailureModal('Your bid must be higher than the current bid.');
+                return;
+            }
+
+            const listingId = this.getAttribute('data-listing-id');
+            const url = `https://api.noroff.dev/api/v1/auction/listings/${listingId}/bids`;
+
+            const options = {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${accessToken}`
+                },
+                body: JSON.stringify({
+                    amount: bidAmount
+                })
+            };
+
+            fetch(url, options)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Error: ${response.statusText}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    showSuccessModal('Bid successful:');
+
+                    const successModalEl = document.getElementById('successModal');
+
+                    successModalEl.addEventListener('hidden.bs.modal', function () {
+                        window.location.reload();
+                    });
+
+                })
+                .catch(error => {
+                    showFailureModal('There was an error placing your bid. Please try again.');
+                });
+        });
+    } else {
+        // If user is not logged in, show message
+        bidButton.addEventListener('click', function () {
+            showSuccessModal('You need to be logged in to make a bid');
+        });
+    }
+
+    const bidInputGroupAppend = document.createElement('div');
+    bidInputGroupAppend.className = 'input-group-append';
+    bidInputGroupAppend.appendChild(bidButton);
+
+    const bidInputGroupContainer = document.createElement('div');
+    bidInputGroupContainer.appendChild(bidInputGroup);
+    bidInputGroupContainer.appendChild(bidInputGroupAppend);
+
+    card.querySelector('.card-body').appendChild(bidInputGroupContainer);
+
+    return card;
+}
+
+// Function to update the UI with fetched listings
+function updateUIWithListings(listings, container, currentPage = 1) {
+    const listingsPerPage = 20;
+    const totalPages = Math.ceil(listings.length / listingsPerPage);
+
+    // Sort listings by creation date (most recent first)
+    listings.sort((a, b) => new Date(b.created) - new Date(a.created));
+
+    // Calculate start and end indexes for the current page
+    const startIndex = (currentPage - 1) * listingsPerPage;
+    const endIndex = Math.min(startIndex + listingsPerPage, listings.length);
+    const listingsToShow = listings.slice(startIndex, endIndex);
+
+    // Clear container
+    container.innerHTML = '';
+
+    // Create and append listing cards
+    listingsToShow.forEach(listing => {
+        const card = createItemCard(listing);
+        container.appendChild(card);
+    });
+
+    // Clear and recreate pagination container
+    const paginationContainer = document.getElementById('pagination');
+    paginationContainer.innerHTML = '';
+
+    // Create page number buttons
+    for (let i = 1; i <= totalPages; i++) {
+        const pageButton = document.createElement('button');
+        pageButton.textContent = i;
+        pageButton.className = 'btn btn-primary';
+        if (i === currentPage) {
+            pageButton.classList.add('active');
+        }
+        pageButton.addEventListener('click', () => {
+            updateUIWithListings(listings, container, i);
+        });
+        paginationContainer.appendChild(pageButton);
+    }
+}
+
+// Function to initialize the application
+async function initialize() {
+    try {
+        const itemCardsContainer = document.getElementById('itemCardsContainer');
+        let allListings = await fetchAllListings();
+
+        updateUIWithListings(allListings, itemCardsContainer);
+
+        // Search functionality
+        const searchInput = document.getElementById('searchInput');
+        const searchButton = document.getElementById('searchButton');
+
+        const handleSearch = async () => {
+            const searchTerm = searchInput.value.trim().toLowerCase();
+            if (searchTerm === '') {
+                // If search term is empty, display all listings
+                updateUIWithListings(allListings, itemCardsContainer);
+            } else {
+                // Filter listings based on search term
+                const filteredListings = allListings.filter(listing =>
+                    listing.tags.some(tag => tag.toLowerCase().includes(searchTerm))
+                );
+                updateUIWithListings(filteredListings, itemCardsContainer);
+            }
+        };
+
+        // Add event listener for search button click
+        searchButton.addEventListener('click', handleSearch);
+
+        // Add event listener for pressing enter in the search input
+        searchInput.addEventListener('keypress', async (event) => {
+            if (event.key === 'Enter') {
+                event.preventDefault(); // Prevent form submission
+                handleSearch();
+            }
+        });
+    } catch (error) {
+        console.error('Error initializing auction:', error);
+    }
+}
+
+async function fetchAllListings() {
+    let allListings = [];
+    let offset = 0;
+    let hasMoreListings = true;
+
+    while (hasMoreListings) {
+        const listingsUrl = `${API_BASE_URL}${USER_LISTINGS_ENDPOINT}?_bids=true&_active=true&limit=100&offset=${offset}`;
+        const listings = await fetchData(listingsUrl);
+
+        if (listings.length > 0) {
+            allListings = allListings.concat(listings);
+            offset += 100; // increment offset to get the next batch of listings
+        } else {
+            hasMoreListings = false; // no more listings to fetch
+        }
+    }
+
+    return allListings;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    // Call your initialize function or other initialization code here
+    initialize();
+});
+
+
+
+
+Content of constants.js:
+// constants.js
+
+// Base URL
+export const API_BASE_URL = "https://api.noroff.dev/api/v1";
+
+// Authentication endpoints
+export const REGISTRATION_ENDPOINT = "/auction/auth/register/";
+export const LOGIN_ENDPOINT = "/auction/auth/login/";
+
+// User endpoints
+export const USER_PROFILE_ENDPOINT = "/auction/profiles/";
+export const USER_LISTINGS_ENDPOINT = "/auction/listings/";
+
+// Bid endpoints
+export const BID_ENDPOINT = "/auction/listings/";
+
+// Pagination & Sorting
+export const DEFAULT_LIMIT = 100;
+export const DEFAULT_OFFSET = 0;
+
+export const accessToken = localStorage.getItem('accessToken'); // Use ACCESS_TOKEN_KEY constant
+export const username = localStorage.getItem('username'); // Use USERNAME_KEY constant
+export const credits = localStorage.getItem('credits'); // Use CREDITS_KEY constant
+
+
+Content of createPDFwithJSCode.js:
+const fs = require('fs');
+const path = require('path');
+
+const directoryPath = 'C:\\Users\\Tord\\Documents\\VS Code Projects\\Semester-Project-2\\src\\js';
+const outputFile = 'allCode.txt'; // Specify the name of the output file
+
+// Function to read all JavaScript files in a directory
+function readFiles(dirname, onFileContent, onError) {
+    fs.readdir(dirname, function (err, filenames) {
+        if (err) {
+            onError(err);
+            return;
+        }
+        filenames.forEach(function (filename) {
+            fs.readFile(path.join(dirname, filename), 'utf-8', function (err, content) {
+                if (err) {
+                    onError(err);
+                    return;
+                }
+                onFileContent(filename, content);
+            });
+        });
+    });
+}
+
+// Function to process content of each file
+function processFile(filename, content) {
+    // Append content to the output file
+    fs.appendFileSync(outputFile, `Content of ${filename}:\n${content}\n\n`);
+}
+
+// Call the readFiles function
+readFiles(directoryPath, processFile, function (err) {
+    console.error('Error reading files:', err);
+});
+
+Content of avatarModal.js:
+let modal = null;
+
+function initializeModal() {
+    modal = document.getElementById('avatarModal');
+}
+
+function showModal(title, content) {
+    const modalTitle = document.querySelector('#avatarModal .modal-title');
+    const modalBody = document.querySelector('#avatarModal .modal-body');
+
+    modalTitle.textContent = title;
+    modalBody.textContent = content;
+
+    modal.classList.add('show');
+}
+
+function closeModal() {
+    modal.classList.remove('show');
+}
+
+function initializeEventListeners() {
+    document.addEventListener('DOMContentLoaded', function () {
+        const showAvatarButton = document.getElementById('avatarIcon');
+
+        showAvatarButton.addEventListener('click', function () {
+            showModal('Change Avatar', 'Update your avatar by entering a new URL.');
+        });
+
+        const closeButtons = document.querySelectorAll('[data-bs-dismiss="modal"], .btn-close');
+        closeButtons.forEach(function (button) {
+            button.addEventListener('click', function () {
+                closeModal();
+            });
+        });
+
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    initializeModal();
+    initializeEventListeners();
+});
+
+export { showModal, closeModal, initializeModal, initializeEventListeners };
+
+
+Content of loggedIn.js:
+function updateLoginLink() {
+    const loginLink = document.getElementById('loginLink');
+    const accessToken = localStorage.getItem('accessToken');
+
+    try {
+        if (loginLink) {
+            if (accessToken) {
+                console.log('Logged in. Access Token:', accessToken);
+                loginLink.textContent = 'Log out';
+                loginLink.href = '#';
+                loginLink.addEventListener('click', () => {
+                    localStorage.removeItem('isLoggedIn');
+                    localStorage.removeItem('username');
+                    localStorage.removeItem('accessToken');
+                    localStorage.removeItem('avatar');
+                    localStorage.removeItem('banner');
+                    window.location.href = "/index.html";
+                });
+            } else {
+                console.log('Not logged in');
+                loginLink.textContent = 'Log in';
+            }
+        }
+    } catch (error) {
+        console.error('Error updating login link:', error.message);
+    }
+}
+
+export { updateLoginLink };
+
+Content of modal.js:
+// Function to show the success modal
+function showSuccessModal(message) {
+    const successModal = new bootstrap.Modal(document.getElementById('successModal'), {
+        keyboard: false
+    });
+    document.querySelector('#successModal .modal-body').textContent = message || 'Action completed successfully.';
+    successModal.show();
+}
+
+// Function to show the failure modal
+function showFailureModal(message) {
+    const failureModal = new bootstrap.Modal(document.getElementById('failureModal'), {
+        keyboard: false
+    });
+    document.querySelector('#failureModal .modal-body').textContent = message || 'There was a problem completing your action.';
+    failureModal.show();
+}
+
+export { showSuccessModal, showFailureModal };
+
+
+Content of profile.js:
+import { initializeEventListeners } from './avatarModal.js';
+import { API_BASE_URL, USER_PROFILE_ENDPOINT, USER_LISTINGS_ENDPOINT, accessToken, credits, username } from "./constants.js";
+import { updateLoginLink } from "./loggedIn.js";
+import { showSuccessModal, showFailureModal } from "./modal.js";
+
+// Check if user is logged in and update login link
+updateLoginLink();
+
+// Function to get the current user's ID
+export function getCurrentUserId() {
+    if (!accessToken) {
+        throw new Error('Access token not found. Please log in.');
+    }
+
+    return accessToken;
+}
+
+// Function to display user profile
+async function displayUserProfile() {
+    try {
+        const usernameElement = document.getElementById('username');
+        const userCreditsElement = document.getElementById('userCredits');
+        const userProfilePic = document.getElementById('profile-image');
+
+        // Make a GET request to fetch profile details
+        const profileUrl = `${API_BASE_URL}${USER_PROFILE_ENDPOINT}${encodeURIComponent(username)}`;
+        const response = await fetch(profileUrl, {
+            headers: {
+                'Authorization': `Bearer ${accessToken}`, // Assuming accessToken is available
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to fetch user profile');
+        }
+
+        const profileData = await response.json();
+
+        if (usernameElement) {
+            usernameElement.textContent = profileData.name || username; // Fallback to the username variable if name isn't in response
+        }
+        if (userCreditsElement) {
+            userCreditsElement.textContent = profileData.credits || 'N/A'; // Fallback to 'N/A' if credits aren't in response
+        }
+        if (userProfilePic && profileData.avatar) {
+            userProfilePic.src = profileData.avatar; // Use the avatar URL from the profile data
+        }
+    } catch (error) {
+        showFailureModal('Error displaying user profile:', error.message);
+    }
+}
+
+async function displayUserListings() {
+    try {
+        const listingsUrl = `${API_BASE_URL}${USER_PROFILE_ENDPOINT}${username}/listings`;
+        const response = await fetch(listingsUrl, {
+            headers: {
+                Authorization: `Bearer ${accessToken}`
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to fetch user listings. Status: ${response.status}`);
+        }
+
+        const listings = await response.json();
+        const listingsContainer = document.getElementById('listingsContainer');
+
+        listingsContainer.innerHTML = ''; // Clear existing listings
+
+        const row = document.createElement('div');
+        row.classList.add('row', 'g-4'); // Use gap classes for spacing between cards
+
+        listings.forEach(listing => {
+            // Use the first media item as the image URL, or a placeholder if none exist
+            const imageUrl = listing.media && listing.media.length > 0 ? listing.media[0] : '/images/placeholderauction.png';
+
+            // Extract last bid information
+            const lastBidInfo = listing.bids && listing.bids.length > 0 ? `Last Bid: ${listing.bids[listing.bids.length - 1].amount}` : 'No bids yet';
+            const bidCountInfo = listing._count && listing._count.bids ? `Number of Bids: ${listing._count.bids}` : 'No bids yet';
+            const bidDeadlineText = new Date(listing.endsAt).toLocaleString();
+            const creationDateText = new Date(listing.created).toLocaleDateString();
+
+            const listingElement = document.createElement('div');
+            listingElement.classList.add('col-md-4', 'col-sm-6');
+            listingElement.innerHTML = `
+                <div class="card h-100 shadow-sm">
+                    <img src="${imageUrl}" class="card-img-top" alt="${listing.title}" style="object-fit: cover; height: 200px;">
+                    <div class="card-body">
+                        <h5 class="card-title">${listing.title}</h5>
+                        <p class="card-text">${listing.description}</p>
+                        <p class="card-text">${lastBidInfo}</p>
+                        <p class="card-text">${bidCountInfo}</p>
+                        <p class="card-text"><strong>Deadline:</strong> ${bidDeadlineText}</p>
+                        <p class="card-text"><strong>Listing Date:</strong> ${creationDateText}</p>
+                    </div>
+                    <div class="card-footer bg-white border-top-0">
+                        <small>Price: ${listing.price}</small>
+                    </div>
+                </div>
+            `;
+
+            row.appendChild(listingElement);
+        });
+
+        listingsContainer.appendChild(row);
+    } catch (error) {
+        console.error('Error fetching user listings:', error);
+    }
+}
+
+displayUserListings();
+
+
+
+// Event listener when DOM content is loaded
+document.addEventListener('DOMContentLoaded', async () => {
+    // Initialize modal event listeners
+    initializeEventListeners();
+    // Display user profile and listings
+    await displayUserProfile();
+
+    // Event listeners for avatar and edit icons
+    const avatarIcon = document.getElementById('avatarIcon');
+    const editIcon = document.getElementById('editIcon');
+    const avatarModal = new bootstrap.Modal(document.getElementById('avatarModal'), {});
+    const editModal = new bootstrap.Modal(document.getElementById('editModal'), {});
+
+    if (avatarIcon) {
+        avatarIcon.addEventListener('click', () => {
+            avatarModal.show();
+        });
+    }
+
+    if (editIcon) {
+        editIcon.addEventListener('click', () => {
+            editModal.show();
+        });
+    }
+});
+
+document.addEventListener('DOMContentLoaded', function () {
+    const avatarForm = document.querySelector('#avatarModal form');
+
+    avatarForm.addEventListener('submit', async function (event) {
+        event.preventDefault(); // Prevent the default form submission.
+
+        const avatarUrlInput = document.getElementById('avatarInput');
+        const avatarUrl = avatarUrlInput.value.trim();
+
+        if (!avatarUrl) {
+            showFailureModal('Please enter a valid URL for the avatar.');
+            return;
+        }
+
+        await updateAvatar(username, avatarUrl); // Use the imported 'username'
+    });
+});
+
+async function updateAvatar(userName, avatarUrl) {
+    const url = `${API_BASE_URL}${USER_PROFILE_ENDPOINT}${encodeURIComponent(userName)}/media`;
+    const options = {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`, // Use the imported 'accessToken'
+        },
+        body: JSON.stringify({ avatar: avatarUrl })
+    };
+
+    try {
+        const response = await fetch(url, options);
+        if (!response.ok) {
+            const errorData = await response.json();
+            showFailureModal(`Failed to update avatar: ${errorData.message || response.statusText}`);
+            return;
+        }
+
+        showSuccessModal('Avatar updated successfully!');
+        window.location.reload(); // Refresh the page to see the updated avatar
+    } catch (error) {
+        showFailureModal('An error occurred while updating the avatar. Please try again.');
+    }
+}
+
+Content of auth.js:
+// Import necessary functions from modal.js
+import { showSuccessModal, showFailureModal } from './modal.js';
+import { API_BASE_URL, REGISTRATION_ENDPOINT, LOGIN_ENDPOINT } from './constants.js';
+import { updateLoginLink } from './loggedIn.js';
+
+updateLoginLink();
+
+// Check if there are items in local storage
+if (localStorage.length > 0) {
+    // Clear local storage
+    localStorage.clear();
+    console.log('Local storage cleared successfully.');
+} else {
+    console.log('Local storage is already empty.');
+}
+
+document.addEventListener("DOMContentLoaded", function () {
+    const registrationForm = document.getElementById("registrationForm");
+    const loginForm = document.getElementById("loginForm");
+
+    registrationForm.addEventListener("submit", function (e) {
+        e.preventDefault();
+
+        const API_REGISTER_URL = API_BASE_URL + REGISTRATION_ENDPOINT;
+
+        const username = document.getElementById("registerUsername").value.trim();
+        const email = document.getElementById("registerEmail").value.trim();
+        const password = document.getElementById("registerPassword").value;
+        const confirmPassword = document.getElementById("confirmPassword").value;
+        const avatar = document.getElementById("profileImageUrl").value.trim();
+
+        // Validation checks
+        if (password !== confirmPassword) {
+            showFailureModal("Registration failed. Passwords do not match.");
+            return;
+        }
+
+        const emailRegex = /@(?:(?:noroff\.no)|(?:stud\.noroff\.no))$/;
+        if (!emailRegex.test(email)) {
+            showFailureModal("Registration failed. You must use a Noroff or stud.noroff.no email address.");
+            return;
+        }
+
+        if (password.length < 8) {
+            showFailureModal("Registration failed. Password must be at least 8 characters long.");
+            return;
+        }
+
+        let registrationData = { name: username, email, password };
+        if (avatar !== "") {
+            registrationData.avatar = avatar;
+        }
+
+        fetch(API_REGISTER_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(registrationData),
+        })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error("Registration failed");
+                }
+                return response.json();
+            })
+            .then(() => {
+                document.getElementById("registrationForm").reset();
+                showSuccessModal("Registration successful! Please log in to continue.");
+            })
+            .catch(() => {
+                showFailureModal("Registration failed. Please check your inputs.");
+            });
+    });
+
+    loginForm.addEventListener("submit", function (e) {
+        e.preventDefault();
+
+        const API_LOGIN_URL = API_BASE_URL + LOGIN_ENDPOINT;
+
+        const email = document.getElementById("loginEmail").value.trim();
+        const password = document.getElementById("loginPassword").value;
+
+        fetch(API_LOGIN_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, password }),
+        })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error("Login failed");
+                }
+                return response.json();
+            })
+            .then(data => {
+                // Store received data in local storage
+                localStorage.setItem("accessToken", data.accessToken);
+                localStorage.setItem("username", data.name);
+                localStorage.setItem("avatar", data.avatar);
+                localStorage.setItem("banner", data.banner);
+                localStorage.setItem("isLoggedIn", "true");
+                localStorage.setItem("credits", data.credits);
+                // Redirect to the homepage or another page
+                window.location.href = "/index.html";
+            })
+            .catch(() => {
+                showFailureModal("Login failed. Email or password is wrong.");
+            });
+    });
+});
+
+
+Content of listItem.js:
+import { API_BASE_URL, USER_LISTINGS_ENDPOINT, accessToken } from "./constants.js";
+import { updateLoginLink } from "./loggedIn.js";
+import { showSuccessModal, showFailureModal } from "./modal.js";
+
+// Function to initialize event listeners
+function initializeEventListeners() {
+    const container = document.getElementById('imageUrls');
+    const addButton = document.getElementById('addImageUrl');
+    let count = 1;
+
+    addButton.addEventListener('click', function () {
+        if (count < 5) {
+            const inputDiv = document.createElement('div');
+            inputDiv.classList.add('mb-2');
+            inputDiv.innerHTML = `<input type="url" class="form-control" name="imageUrls[]" placeholder="Enter image URL">`;
+            container.appendChild(inputDiv);
+            count++;
+        } else {
+            showFailureModal('You can add a maximum of 5 images.');
+        }
+    });
+
+    const listItemForm = document.querySelector("form");
+    listItemForm.addEventListener("submit", listNewItem);
+}
+
+// Function to list a new item
+async function listNewItem(event) {
+    event.preventDefault();
+
+    if (!accessToken) {
+        showFailureModal("Please log in to list an item.");
+        return;
+    }
+
+    const title = document.getElementById("title").value;
+    const description = document.getElementById("itemDescription").value;
+    const startDate = document.getElementById("startDate").value;
+    const finishDate = document.getElementById("finishDate").value;
+    const tags = document.getElementById("tags").value;
+    const imageUrls = Array.from(document.querySelectorAll("#imageUrls input")).map(input => input.value);
+
+    if (!validateForm(title, description, startDate, finishDate, imageUrls, tags)) {
+        return;
+    }
+
+    const newListing = {
+        title,
+        description,
+        tags: tags.split(',').map(tag => tag.trim()),
+        media: imageUrls.filter(url => url.trim() !== ''), // Filter out empty URLs
+        endsAt: finishDate,
+        created: startDate,
+    };
+
+    try {
+        const response = await fetch(`${API_BASE_URL}${USER_LISTINGS_ENDPOINT}`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${accessToken}`,
+            },
+            body: JSON.stringify(newListing),
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to list item. Status: ${response.status}`);
+        }
+
+        handleSuccessfulListing(event);
+    } catch (error) {
+        handleListingError(error);
+    }
+}
+
+// Function to validate form inputs
+function validateForm(title, description, startDate, finishDate, imageUrls, tags) {
+    if (!title || !description || !startDate || !finishDate || !tags.trim() || imageUrls.some(url => url.trim() === '')) {
+        showFailureModal("Ensure all fields are filled correctly and all image URLs are valid.");
+        return false;
+    }
+
+    return true;
+}
+
+// Function to handle successful listing
+function handleSuccessfulListing(event) {
+    showSuccessModal("Your item has been listed successfully. Redirecting to home page...");
+    event.target.reset();
+    // Redirecting after a brief pause to allow users to read the modal message
+    setTimeout(() => window.location.href = "/index.html", 3000); // Adjust the URL as necessary
+}
+
+// Function to handle listing errors
+function handleListingError(error) {
+    console.error("Error listing item:", error.message);
+    showFailureModal("An error occurred while listing the item. Please check your information and try again.");
+}
+
+// Call the function to initialize event listeners
+initializeEventListeners();
+
+document.addEventListener('DOMContentLoaded', () => {
+    updateLoginLink();
+});
+
+

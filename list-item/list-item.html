@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login and Register Page</title>
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="../dist/css/styles.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
+    <script src="https://kit.fontawesome.com/eb8a099288.js" crossorigin="anonymous"></script>
+    <script src="../src/js/listItem.js" type="module"></script>
+</head>
+
+<body>
+    <header>
+        <nav class="navbar navbar-expand-lg navbar-light bg-primary d-flex justify-content-center align-items-center">
+            <div class="container">
+
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
+                    data-bs-target="#navbarNavAltMarkup" aria-controls="navbarNavAltMarkup" aria-expanded="false"
+                    aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="collapse navbar-collapse justify-content-center" id="navbarNavAltMarkup">
+                    <a class="navbar-brand me-auto me-lg-0" href="#">
+                        <img src="/images/auction_logo2_nobackground.png" alt="Auction House Logo"
+                            style="max-width: 100px;">
+                    </a>
+                    <div class="navbar-nav d-flex justify-content-center align-items-center">
+                        <a class="nav-link text-dark fs-4" href="/index.html">Home</a>
+                        <a class="nav-link text-dark fs-4" href="../list-item/list-item.html">List Item</a>
+                        <a class="nav-link text-dark fs-4" href="../auth/login.html" id="loginLink">Log in</a>
+                        <div class="navbar-nav ms-lg-auto">
+                            <a href="../profile/profile.html" class="nav-item text-decoration-none text-black">
+                                <i class="fa-solid fa-user fa-2x ms-3 pl-3"></i>
+                            </a>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </nav>
+        <div class="bg-primary text-center py-3 shadow-lg border-top border-white">
+            <h1 class="fs-2 fw-bold text-black">Auction House</h1>
+        </div>
+    </header>
+
+    <main>
+        <div class="container ">
+            <div class="row justify-content-center">
+                <div class="col-md-8 my-3">
+                    <div class="bg-primary p-4 rounded border border-dark">
+                        <h2 class="text-center mb-4">List your item for sale:</h2>
+                        <form>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <label for="title" class="form-label">Title:</label>
+                                    <input type="text" class="form-control mb-3" id="title" placeholder="Enter title">
+                                    <label for="itemDescription" class="form-label">Item description:</label>
+                                    <textarea class="form-control" id="itemDescription" rows="5"
+                                        placeholder="Enter item description"></textarea>
+                                    <label for="tags" class="form-label mt-3">Tags:</label>
+                                    <input type="text" class="form-control mb-3" id="tags" placeholder="Enter tags">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="startDate" class="form-label">Start date and time:</label>
+                                    <input type="datetime-local" class="form-control mb-3" id="startDate" step="1">
+                                    <label for="finishDate" class="form-label">Finish date and time:</label>
+                                    <input type="datetime-local" class="form-control" id="finishDate" step="1">
+                                </div>
+                            </div>
+                            <div class="mb-4">
+                                <label class="form-label">Add image URLs (max 5):</label>
+                                <div id="imageUrls">
+                                    <div class="mb-2">
+                                        <input type="url" class="form-control" name="imageUrls[]"
+                                            placeholder="Enter image URL">
+                                    </div>
+                                </div>
+                                <button type="button" id="addImageUrl" class="btn btn-secondary btn-sm">Add another
+                                    image</button>
+                                <small class="text-muted d-block mt-2">You can add up to 5 images.</small>
+                            </div>
+                            <div class="text-center mt-4">
+                                <button type="submit" class="btn btn-light">List Item</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Success Modal -->
+        <div class="modal fade" id="successModal" tabindex="-1" aria-labelledby="successModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="successModalLabel">Success</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        Action completed successfully.
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-success" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Failure Modal -->
+        <div class="modal fade" id="failureModal" tabindex="-1" aria-labelledby="failureModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="failureModalLabel">Failure</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        There was a problem completing your action.
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-danger" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+
+
+    <!-- Footer -->
+    <footer class="container bg-primary py-5">
+        <div class="row justify-content-center">
+            <div class="col-auto">
+                <div class="fs-4 fw-normal">Auctions</div>
+            </div>
+            <div class="col-auto">
+                <div class="fs-4 fw-normal">Contact</div>
+            </div>
+        </div>
+    </footer>
+
+</body>
+
+</html>

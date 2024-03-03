@@ -1,0 +1,71 @@
+@import './variables.scss';
+// Import Bootstrap variables
+@import '../../node_modules/bootstrap/scss/bootstrap.scss';
+
+// Import Google Fonts
+@import url('https://fonts.googleapis.com/css2?family=Roboto+Slab:wght@400;700&display=swap');
+
+// Override Bootstrap variables
+$body-font-family: 'Roboto Slab', serif;
+$headings-font-family: 'Roboto Slab', serif;
+
+a {
+    font-family: 'Roboto Slab', serif;
+}
+
+.listing {
+    border: 1px solid #ccc;
+    margin-bottom: 20px;
+    padding: 20px;
+    display: flex;
+    align-items: center;
+}
+
+.listing img {
+    max-width: 100px;
+    margin-right: 20px;
+}
+
+.listing-details {
+    flex: 1;
+}
+
+.listing p {
+    margin: 5px 0;
+}
+
+.carousel-control-prev-icon,
+.carousel-control-next-icon {
+    background-image: none;
+    /* Remove default Bootstrap background */
+    background-color: rgba(0, 0, 0, 0.5);
+    /* Add a semi-transparent background */
+    border-radius: 50%;
+    /* Make it round */
+    width: 40px;
+    /* Set a fixed width */
+    height: 40px;
+    /* Set a fixed height */
+    display: flex;
+    /* Use flex for centering the SVG icon */
+    justify-content: center;
+    /* Center horizontally */
+    align-items: center;
+    /* Center vertically */
+}
+
+.carousel-control-prev-icon:after,
+.carousel-control-next-icon:after {
+    content: '';
+    /* This will represent the arrow */
+    display: inline-block;
+    /* Make it an inline block */
+    width: 20px;
+    /* Width of the arrow */
+    height: 20px;
+    /* Height of the arrow */
+    background: url('/path-to-your-custom-arrow.svg') no-repeat center center;
+    /* Path to the custom arrow icon */
+    background-size: contain;
+    /* Make the icon fit within the box */
+}
